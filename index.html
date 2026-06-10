@@ -4,14 +4,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Bataille 3D</title>
 <style>
-body { margin:0; overflow:hidden; background:#000; font-family:Arial }
-#ui { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.6); padding:10px; border-radius:10px; z-index:100 }
+body { margin:0; overflow:hidden; background:#000; font-family:Arial; touch-action:none }
+#ui { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.6); padding:10px; border-radius:10px; z-index:100; font-size:18px }
 #weapons { position:absolute; top:10px; right:10px; display:flex; gap:10px; z-index:100 }
-.weapon { padding:10px; background:#333; color:white; border-radius:8px; border:2px solid #555 }
+.weapon { padding:10px 15px; background:#333; color:white; border-radius:8px; border:2px solid #555 }
 .weapon.active { border-color:yellow; background:#555 }
-#controls { position:absolute; bottom:30px; width:100%; display:flex; justify-content:center; gap:20px; z-index:100 }
-.btn { padding:20px 30px; font-size:18px; border:none; border-radius:15px; color:white; font-weight:bold }
-#shoot { background:red } #build { background:green } #grenade { background:orange } #don { background:gold }
+#btns { position:absolute; bottom:30px; width:100%; display:flex; justify-content:center; gap:15px; z-index:100 }
+button { padding:18px 25px; font-size:16px; border:none; border-radius:15px; color:white; font-weight:bold }
+#build { background:#33aa33 } #grenade { background:#ff6600 } #don { background:#ffaa00 }
 #joystick { position:absolute; bottom:30px; left:30px; width:120px; height:120px; background:rgba(255,255,255,0.2); border-radius:50% }
 #stick { position:absolute; width:50px; height:50px; background:white; border-radius:50%; top:35px; left:35px }
 #startScreen, #gameOver { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; z-index:999 }
@@ -21,14 +21,13 @@ body { margin:0; overflow:hidden; background:#000; font-family:Arial }
 <body>
 <div id="startScreen">
   <h1>🔥 BATAILLE 3D 🔥</h1>
-  <p>Niveau <span id="level">1</span> | XP: <span id="xp">0</span>/100</p>
   <button onclick="startGame()">START</button>
+  <p style="margin-top:20px">Tap n’importe où pour tirer!</p>
 </div>
 
 <div id="gameOver" style="display:none">
   <h1>GAME OVER</h1>
   <p>Kills: <span id="finalKills">0</span></p>
-  <p>XP gagné: <span id="xpGained">0</span></p>
   <button onclick="location.reload()">REJOUER</button>
 </div>
 
@@ -43,11 +42,10 @@ body { margin:0; overflow:hidden; background:#000; font-family:Arial }
 </div>
 
 <div id="joystick"><div id="stick"></div></div>
-<div id="controls">
-  <button id="build" class="btn">BUILD</button>
-  <button id="shoot" class="btn">TIRER</button>
-  <button id="grenade" class="btn">GRENADE</button>
-  <button id="don" class="btn">DON</button>
+<div id="btns">
+  <button id="build">BUILD</button>
+  <button id="grenade">GRENADE</button>
+  <button id="don">DON</button>
 </div>
 
 <script type="importmap">
@@ -58,24 +56,8 @@ body { margin:0; overflow:hidden; background:#000; font-family:Arial }
 import * as THREE from 'three';
 
 let scene, camera, renderer, player, bullets=[], enemies=[], walls=[];
-let hp=100, mats=200, kills=0, weapon=0, xp=0, level=1, gameStarted=false;
-let moveX=0, moveZ=0;
-
-// XP + Niveau
-function loadXP() {
-  const data = localStorage.getItem('battleXP');
-  if(data) { const d = JSON.parse(data); xp=d.xp||0; level=d.level||1; }
-}
-function saveXP() {
-  localStorage.setItem('battleXP', JSON.stringify({xp, level}));
-}
-function addXP(amount) {
-  xp += amount;
-  if(xp >= level*100) { xp -= level*100; level++; alert('LEVEL UP! Niveau '+level); }
-  document.getElementById('xp').innerText = xp;
-  document.getElementById('level').innerText = level;
-  saveXP();
-}
+let hp=100, mats=200, kills=0, weapon=0, gameStarted=false;
+let moveX=0, moveZ=0, lastShot=0;
 
 window.startGame = function() {
   document.getElementById('startScreen').style.display = 'none';
@@ -84,36 +66,29 @@ window.startGame = function() {
 }
 
 function init() {
-  try {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(10, 20, 10);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x404040));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({color: 0x228B22}));
-    ground.rotation.x = -Math.PI/2;
-    scene.add(ground);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({color: 0x228B22}));
+  ground.rotation.x = -Math.PI/2;
+  scene.add(ground);
 
-    player = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshLambertMaterial({color: 0x00ff00}));
-    player.position.y = 1;
-    scene.add(player);
-    camera.position.set(0, 5, 10);
-    camera.lookAt(player.position);
+  player = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshLambertMaterial({color: 0x00ff00}));
+  player.position.y = 1;
+  scene.add(player);
+  camera.position.set(0, 5, 10);
+  camera.lookAt(player.position);
 
-    spawnEnemies();
-    animate();
-    setupControls();
-  } catch(e) {
-    alert('Erreur: ' + e.message);
-  }
+  spawnEnemies();
+  animate();
+  setupControls();
 }
 
 function spawnEnemies() {
@@ -126,22 +101,36 @@ function spawnEnemies() {
   }
 }
 
-function setWeapon(w) {
+window.setWeapon = function(w) {
   weapon = w;
   document.querySelectorAll('.weapon').forEach((el, i) => {
     el.classList.toggle('active', i==w);
   });
 }
-window.setWeapon = setWeapon;
 
 function shoot() {
   if(!gameStarted) return;
-  const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
-  bullet.position.copy(player.position);
-  bullet.velocity = new THREE.Vector3(Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y)).multiplyScalar(weapon==1?0.6:1);
-  bullet.damage = weapon==1?15:25;
-  scene.add(bullet);
-  bullets.push(bullet);
+  const now = Date.now();
+  if(now - lastShot < 200) return; // anti-spam
+  lastShot = now;
+
+  const shots = weapon==1? 5 : 1;
+  const spread = weapon==1? 0.3 : 0;
+
+  for(let i=0; i<shots; i++) {
+    const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffff00}));
+    bullet.position.copy(player.position);
+
+    let dir = new THREE.Vector3(moveX, 0, moveZ);
+    if(dir.length() < 0.1) dir.set(0, 0, -1);
+    dir.x += (Math.random()-0.5)*spread;
+    dir.z += (Math.random()-0.5)*spread;
+
+    bullet.velocity = dir.normalize().multiplyScalar(weapon==1?0.6:0.9);
+    bullet.damage = weapon==1?15:25;
+    scene.add(bullet);
+    bullets.push(bullet);
+  }
 }
 
 function build() {
@@ -164,7 +153,7 @@ function grenade() {
         scene.remove(e);
         enemies.splice(enemies.indexOf(e), 1);
         kills++;
-        addXP(20);
+        updateUI();
         spawnEnemies();
       }
     }
@@ -186,12 +175,18 @@ function gameOver() {
   gameStarted = false;
   document.getElementById('gameOver').style.display = 'flex';
   document.getElementById('finalKills').innerText = kills;
-  document.getElementById('xpGained').innerText = kills*20;
-  addXP(kills*20);
 }
 
 function setupControls() {
-  document.getElementById('shoot').onclick = shoot;
+  // NOUVEAU MODE : TAP POUR TIRER
+  document.body.addEventListener('touchend', (e) => {
+    if(!gameStarted) return;
+    // Si t’as pas touché le joystick, ça tire
+    if(!e.target.closest('#joystick') &&!e.target.closest('button')) {
+      shoot();
+    }
+  });
+
   document.getElementById('build').onclick = build;
   document.getElementById('grenade').onclick = grenade;
   document.getElementById('don').onclick = don;
@@ -199,6 +194,7 @@ function setupControls() {
   const joy = document.getElementById('joystick');
   const stick = document.getElementById('stick');
   joy.addEventListener('touchmove', e => {
+    e.preventDefault();
     const rect = joy.getBoundingClientRect();
     let x = e.touches[0].clientX - rect.left - 60;
     let y = e.touches[0].clientY - rect.top - 60;
@@ -228,21 +224,22 @@ function animate() {
 
   bullets = bullets.filter(b => {
     b.position.add(b.velocity);
+    let remove = false;
     enemies.forEach(e => {
-      if(b.position.distanceTo(e.position) < 1) {
+      if(b.position.distanceTo(e.position) < 1.2) {
         e.hp -= b.damage;
         scene.remove(b);
+        remove = true;
         if(e.hp <= 0) {
           scene.remove(e);
           enemies.splice(enemies.indexOf(e), 1);
           kills++;
-          addXP(20);
+          updateUI();
           spawnEnemies();
         }
-        b.remove = true;
       }
     });
-    if(b.remove || b.position.length() > 100) {
+    if(remove || b.position.length() > 100) {
       scene.remove(b);
       return false;
     }
@@ -261,10 +258,6 @@ function animate() {
 
   renderer.render(scene, camera);
 }
-
-loadXP();
-document.getElementById('xp').innerText = xp;
-document.getElementById('level').innerText = level;
 </script>
 </body>
 </html>
