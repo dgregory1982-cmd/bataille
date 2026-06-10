@@ -2,28 +2,27 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Bataille 3D Royale</title>
+<title>Bataille 3D</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; font-family:Arial; touch-action:none }
 #ui { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.7); padding:12px; border-radius:12px; z-index:100; font-size:18px }
 #weapons { position:absolute; top:10px; right:10px; display:flex; gap:8px; z-index:100 }
-.weapon { padding:10px 14px; background:#222; color:white; border-radius:8px; border:2px solid #555; font-size:14px }
+.weapon { padding:10px 14px; background:#222; color:white; border-radius:8px; border:2px solid #555 }
 .weapon.active { border-color:yellow; background:#444 }
 #btns { position:absolute; bottom:25px; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:100 }
 button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; color:white; font-weight:bold }
 #build { background:#2d8f2d } #grenade { background:#e65c00 } #don { background:#ffaa00 }
-#joystick { position:absolute; bottom:25px; left:25px; width:130px; height:130px; background:rgba(255,255,255,0.15); border-radius:50%; border:3px solid rgba(255,255,255,0.3) }
-#stick { position:absolute; width:55px; height:55px; background:white; border-radius:50%; top:37px; left:37px; box-shadow:0 0 10px rgba(0,0,0,0.5) }
-#aimZone { position:absolute; top:0; right:0; width:60%; height:70%; z-index:50 }
+#joystick { position:absolute; bottom:25px; left:25px; width:130px; height:130px; background:rgba(255,255,255,0.15); border-radius:50%; border:3px solid rgba(255,255,255,0.3); z-index:101 }
+#stick { position:absolute; width:55px; height:55px; background:white; border-radius:50%; top:37px; left:37px }
 #startScreen, #gameOver { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; z-index:999 }
-#startScreen button, #gameOver button { padding:25px 55px; font-size:28px; background:#ff0000; border:none; border-radius:20px; color:white; margin-top:20px }
+#startScreen button, #gameOver button { padding:25px 55px; font-size:28px; background:#ff0000; border:none; border-radius:20px; color:white }
 </style>
 </head>
 <body>
 <div id="startScreen">
-  <h1>🔥 BATAILLE 3D ROYALE 🔥</h1>
-  <p>Joystick gauche = bouger</p>
-  <p>Glisse en haut à droite = viser/tirer</p>
+  <h1>🔥 BATAILLE 3D 🔥</h1>
+  <p>Gauche = Bouger</p>
+  <p>Droite = Tap pour tirer</p>
   <button onclick="startGame()">START</button>
 </div>
 
@@ -43,7 +42,6 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
   <div class="weapon" onclick="setWeapon(2)">💣 Grenade</div>
 </div>
 
-<div id="aimZone"></div>
 <div id="joystick"><div id="stick"></div></div>
 <div id="btns">
   <button id="build">BUILD</button>
@@ -58,9 +56,9 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
 <script type="module">
 import * as THREE from 'three';
 
-let scene, camera, renderer, player, bullets=[], enemies=[], walls=[], trees=[], houses=[];
+let scene, camera, renderer, player, bullets=[], enemies=[], walls=[];
 let hp=100, mats=200, kills=0, weapon=0, gameStarted=false;
-let moveX=0, moveZ=0, yaw=0, pitch=0, lastShot=0;
+let moveX=0, moveZ=0, lastShot=0;
 
 window.startGame = function() {
   document.getElementById('startScreen').style.display = 'none';
@@ -71,28 +69,22 @@ window.startGame = function() {
 function init() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB);
-  scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
   renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // LUMIERE REALISTE
-  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-  sun.position.set(50, 100, 50);
-  sun.castShadow = true;
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.position.set(30, 50, 30);
   scene.add(sun);
-  scene.add(new THREE.AmbientLight(0x404040, 0.6));
 
-  // SOL TEXTURE
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(500, 500, 32, 32),
+    new THREE.PlaneGeometry(400, 400),
     new THREE.MeshLambertMaterial({color: 0x3a5f3a})
   );
   ground.rotation.x = -Math.PI/2;
-  ground.receiveShadow = true;
   scene.add(ground);
 
   // JOUEUR REALISTE
@@ -103,29 +95,21 @@ function init() {
   player.add(body); player.add(head);
   player.position.y = 1.5;
   scene.add(player);
+  camera.position.set(0, 5, 10);
 
-  // DECORS REALISTES
-  for(let i=0; i<12; i++) {
-    const house = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.BoxGeometry(8,5,8), new THREE.MeshLambertMaterial({color: 0xd4a373}));
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(5.5,4,4), new THREE.MeshLambertMaterial({color: 0x9c2c2c}));
-    roof.position.y = 4.5;
-    house.add(base); house.add(roof);
-    house.position.set(Math.random()*180-90, 2.5, Math.random()*180-90);
-    house.castShadow = true;
-    houses.push(house);
+  // DECORS
+  for(let i=0; i<10; i++) {
+    const house = new THREE.Mesh(new THREE.BoxGeometry(8,5,8), new THREE.MeshLambertMaterial({color: 0xd4a373}));
+    house.position.set(Math.random()*150-75, 2.5, Math.random()*150-75);
     scene.add(house);
   }
-
-  for(let i=0; i<30; i++) {
+  for(let i=0; i<25; i++) {
     const tree = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.8,5), new THREE.MeshLambertMaterial({color: 0x8b5a2b}));
-    const leaves = new THREE.Mesh(new THREE.SphereGeometry(3), new THREE.MeshLambertMaterial({color: 0x2d6a2d}));
-    leaves.position.y = 4;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,4), new THREE.MeshLambertMaterial({color: 0x8b5a2b}));
+    const leaves = new THREE.Mesh(new THREE.SphereGeometry(2.5), new THREE.MeshLambertMaterial({color: 0x2d6a2d}));
+    leaves.position.y = 3.5;
     tree.add(trunk); tree.add(leaves);
-    tree.position.set(Math.random()*250-125, 2.5, Math.random()*250-125);
-    tree.castShadow = true;
-    trees.push(tree);
+    tree.position.set(Math.random()*200-100, 2, Math.random()*200-100);
     scene.add(tree);
   }
 
@@ -135,15 +119,14 @@ function init() {
 }
 
 function spawnEnemies() {
-  for(let i=0; i<6; i++) {
+  for(let i=0; i<5; i++) {
     const enemy = new THREE.Group();
     const eBody = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.5), new THREE.MeshLambertMaterial({color: 0xff0000}));
     const eHead = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshLambertMaterial({color: 0xffdbac}));
     eHead.position.y = 1;
     enemy.add(eBody); enemy.add(eHead);
-    enemy.position.set(Math.random()*60-30, 1.5, Math.random()*60-30);
-    enemy.hp = 50;
-    enemy.castShadow = true;
+    enemy.position.set(Math.random()*50-25, 1.5, Math.random()*50-25);
+    enemy.hp = 40;
     scene.add(enemy);
     enemies.push(enemy);
   }
@@ -159,24 +142,20 @@ window.setWeapon = function(w) {
 function shoot() {
   if(!gameStarted) return;
   const now = Date.now();
-  if(now - lastShot < 250) return;
+  if(now - lastShot < 200) return;
   lastShot = now;
 
   const shots = weapon==1? 6 : 1;
-  const spread = weapon==1? 0.25 : 0;
+  const spread = weapon==1? 0.3 : 0;
 
   for(let i=0; i<shots; i++) {
     const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshBasicMaterial({color: 0xffff00}));
     bullet.position.copy(player.position);
     bullet.position.y += 1;
 
-    let dir = new THREE.Vector3(
-      Math.sin(yaw) * Math.cos(pitch),
-      Math.sin(pitch),
-      -Math.cos(yaw) * Math.cos(pitch)
-    );
+    let dir = new THREE.Vector3(moveX, 0, moveZ);
+    if(dir.length() < 0.1) dir.set(0, 0, -1);
     dir.x += (Math.random()-0.5)*spread;
-    dir.y += (Math.random()-0.5)*spread;
     dir.z += (Math.random()-0.5)*spread;
 
     bullet.velocity = dir.normalize().multiplyScalar(weapon==1?0.7:1);
@@ -192,7 +171,6 @@ function build() {
   const wall = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3.5, 0.6), new THREE.MeshLambertMaterial({color: 0x8B4513}));
   wall.position.copy(player.position);
   wall.position.z -= 3;
-  wall.castShadow = true;
   scene.add(wall);
   walls.push(wall);
   updateUI();
@@ -231,12 +209,16 @@ function gameOver() {
   document.getElementById('finalKills').innerText = kills;
 }
 
-// CONTROLES NOUVEAU MODE
+// CONTROLES FIXES
 function setupControls() {
-  // JOYSTICK GAUCHE = BOUGER
+  // JOYSTICK GAUCHE
   const joy = document.getElementById('joystick');
   const stick = document.getElementById('stick');
+  let joyActive = false;
+
+  joy.addEventListener('touchstart', e => { joyActive = true; e.preventDefault(); });
   joy.addEventListener('touchmove', e => {
+    if(!joyActive) return;
     e.preventDefault();
     const rect = joy.getBoundingClientRect();
     let x = e.touches[0].clientX - rect.left - 65;
@@ -249,36 +231,20 @@ function setupControls() {
     moveZ = Math.sin(angle)*0.25;
   });
   joy.addEventListener('touchend', () => {
+    joyActive = false;
     stick.style.left = '37px';
     stick.style.top = '37px';
     moveX = moveZ = 0;
   });
 
-  // ZONE HAUTE DROITE = VISER + TIRER
-  const aimZone = document.getElementById('aimZone');
-  let isAiming = false;
-  aimZone.addEventListener('touchstart', e => {
-    isAiming = true;
-    updateAim(e.touches[0]);
+  // TAP DROITE = TIRER DIRECT
+  document.body.addEventListener('touchend', (e) => {
+    if(!gameStarted) return;
+    // Si t’as pas touché joystick ou bouton → ça tire
+    if(!e.target.closest('#joystick') &&!e.target.closest('button')) {
+      shoot();
+    }
   });
-  aimZone.addEventListener('touchmove', e => {
-    if(isAiming) updateAim(e.touches[0]);
-  });
-  aimZone.addEventListener('touchend', () => {
-    if(isAiming) shoot();
-    isAiming = false;
-  });
-
-  function updateAim(touch) {
-    const centerX = window.innerWidth * 0.8;
-    const centerY = window.innerHeight * 0.35;
-    const dx = touch.clientX - centerX;
-    const dy = touch.clientY - centerY;
-    yaw = Math.atan2(dx, 100);
-    pitch = Math.max(-0.8, Math.min(0.8, dy / 200));
-    camera.rotation.y = -yaw;
-    camera.rotation.x = pitch;
-  }
 
   document.getElementById('build').onclick = build;
   document.getElementById('grenade').onclick = grenade;
@@ -292,8 +258,9 @@ function animate() {
   player.position.x += moveX;
   player.position.z += moveZ;
   camera.position.x = player.position.x;
-  camera.position.y = player.position.y + 0.5;
-  camera.position.z = player.position.z;
+  camera.position.y = player.position.y + 3;
+  camera.position.z = player.position.z + 8;
+  camera.lookAt(player.position);
 
   bullets = bullets.filter(b => {
     b.position.add(b.velocity);
@@ -330,12 +297,6 @@ function animate() {
   });
 
   renderer.render(scene, camera);
-}
-
-window.onresize = () => {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
 }
 </script>
 </body>
