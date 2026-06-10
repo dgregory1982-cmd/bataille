@@ -1,28 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Bataille 3D Royale</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; font-family:Arial; touch-action:none }
 #ui { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.7); padding:12px; border-radius:12px; z-index:100; font-size:18px }
 #weapons { position:absolute; top:10px; right:10px; display:flex; gap:8px; z-index:100 }
-.weapon { padding:10px 14px; background:#222; color:white; border-radius:8px; border:2px solid #555 }
+.weapon { padding:10px 14px; background:#222; color:white; border-radius:8px; border:2px solid #555; font-size:14px }
 .weapon.active { border-color:yellow; background:#444 }
 #btns { position:absolute; bottom:25px; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:100 }
 button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; color:white; font-weight:bold }
-#build { background:#2d8f2d } #don { background:#ffaa00 }
+#build { background:#2d8f2d }
+#don { background:#ffaa00; border:2px solid gold }
 #joystick { position:absolute; bottom:25px; left:25px; width:130px; height:130px; background:rgba(255,255,255,0.15); border-radius:50%; border:3px solid rgba(255,255,255,0.3); z-index:101 }
 #stick { position:absolute; width:55px; height:55px; background:white; border-radius:50%; top:37px; left:37px }
 .loot { position:absolute; color:gold; font-weight:bold; font-size:22px; pointer-events:none; animation:float 1s ease-out forwards; z-index:200 }
 @keyframes float { 0%{transform:translateY(0);opacity:1} 100%{transform:translateY(-60px);opacity:0} }
-#startScreen, #gameOver { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; z-index:999 }
-#startScreen button, #gameOver button { padding:25px 55px; font-size:28px; background:#ff0000; border:none; border-radius:20px; color:white }
+#startScreen, #gameOver, #donPopup { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; z-index:999 }
+#donPopup { display:none; background:rgba(0,0,0,0.85) }
+#donPopup button { padding:15px 30px; margin:8px; font-size:20px; background:#ffaa00; border:none; border-radius:15px; color:black; font-weight:bold }
+#startScreen button, #gameOver button { padding:25px 55px; font-size:28px; background:#ff0000; border:none; border-radius:20px; color:white; margin-top:20px }
 </style>
 </head>
 <body>
 <div id="startScreen">
-  <h1>🔥 BATAILLE 3D 🔥</h1>
+  <h1>🔥 BATAILLE 3D ROYALE 🔥</h1>
   <p>Gauche = Bouger</p>
   <p>Droite = Tap pour tirer</p>
   <p>Coffres dorés = +50 mats</p>
@@ -33,6 +37,15 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
   <h1>GAME OVER</h1>
   <p>Kills: <span id="finalKills">0</span></p>
   <button onclick="location.reload()">REJOUER</button>
+</div>
+
+<div id="donPopup">
+  <h2>💰 SOUTENIR GREGORY 💰</h2>
+  <p>Merci pour ton soutien frérot:</p>
+  <button onclick="donate(1)">1€ = +200 mats</button>
+  <button onclick="donate(3)">3€ = +700 mats</button>
+  <button onclick="donate(5)">5€ = +1500 mats</button>
+  <button onclick="closeDon()" style="background:#555;color:white">Fermer</button>
 </div>
 
 <div id="ui">
@@ -47,7 +60,7 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
 <div id="joystick"><div id="stick"></div></div>
 <div id="btns">
   <button id="build">BUILD</button>
-  <button id="don">DON</button>
+  <button id="don">DON 💰</button>
 </div>
 
 <script type="importmap">
@@ -61,10 +74,32 @@ let scene, camera, renderer, player, bullets=[], enemies=[], walls=[], chests=[]
 let hp=100, mats=200, kills=0, weapon=0, gameStarted=false;
 let moveX=0, moveZ=0, lastShot=0;
 
+// TON LIEN PAYPAL ICI
+const PAYPAL_LINK = "https://paypal.me/GregoryDandrieu";
+
 window.startGame = function() {
   document.getElementById('startScreen').style.display = 'none';
   gameStarted = true;
   init();
+}
+
+window.closeDon = function() {
+  document.getElementById('donPopup').style.display = 'none';
+}
+
+window.donate = function(euros) {
+  let bonusMats = euros * 200;
+  if(euros == 3) bonusMats = 700;
+  if(euros == 5) bonusMats = 1500;
+
+  mats += bonusMats;
+  updateUI();
+  showLoot("+" + bonusMats + " 🧱 MERCI!");
+
+  // Ouvre PayPal direct
+  window.open(PAYPAL_LINK + "/" + euros, '_blank');
+
+  closeDon();
 }
 
 function init() {
@@ -88,7 +123,6 @@ function init() {
   ground.rotation.x = -Math.PI/2;
   scene.add(ground);
 
-  // JOUEUR
   player = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.5), new THREE.MeshLambertMaterial({color: 0x00ff00}));
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshLambertMaterial({color: 0xffdbac}));
@@ -98,7 +132,6 @@ function init() {
   scene.add(player);
   camera.position.set(0, 5, 10);
 
-  // DECORS
   for(let i=0; i<8; i++) {
     const house = new THREE.Mesh(new THREE.BoxGeometry(8,5,8), new THREE.MeshLambertMaterial({color: 0xd4a373}));
     house.position.set(Math.random()*150-75, 2.5, Math.random()*150-75);
@@ -192,9 +225,7 @@ function build() {
 }
 
 function don() {
-  mats += 100;
-  updateUI();
-  showLoot("+100 🧱");
+  document.getElementById('donPopup').style.display = 'flex';
 }
 
 function showLoot(txt) {
@@ -208,7 +239,7 @@ function showLoot(txt) {
 }
 
 function updateUI() {
-  document.getElementById('hp').innerText = Math.floor(hp); // FIX: plus de décimales
+  document.getElementById('hp').innerText = Math.floor(hp);
   document.getElementById('mats').innerText = mats;
   document.getElementById('kills').innerText = kills;
 }
@@ -268,7 +299,6 @@ function animate() {
   camera.position.z = player.position.z + 8;
   camera.lookAt(player.position);
 
-  // COFFRES
   chests = chests.filter(chest => {
     if(!chest.userData.opened && player.position.distanceTo(chest.position) < 2) {
       chest.userData.opened = true;
