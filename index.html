@@ -11,7 +11,7 @@ body { margin:0; overflow:hidden; background:#000; font-family:Arial; touch-acti
 .weapon.active { border-color:yellow; background:#444 }
 #btns { position:absolute; bottom:25px; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:100 }
 button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; color:white; font-weight:bold }
-#build { background:#2d8f2d } #grenade { background:#e65c00 } #don { background:#ffaa00 }
+#build { background:#2d8f2d } #don { background:#ffaa00 }
 #joystick { position:absolute; bottom:25px; left:25px; width:130px; height:130px; background:rgba(255,255,255,0.15); border-radius:50%; border:3px solid rgba(255,255,255,0.3); z-index:101 }
 #stick { position:absolute; width:55px; height:55px; background:white; border-radius:50%; top:37px; left:37px }
 .loot { position:absolute; color:gold; font-weight:bold; font-size:22px; pointer-events:none; animation:float 1s ease-out forwards; z-index:200 }
@@ -25,7 +25,7 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
   <h1>🔥 BATAILLE 3D 🔥</h1>
   <p>Gauche = Bouger</p>
   <p>Droite = Tap pour tirer</p>
-  <p>Coffres dorés = +50 mats + Arme</p>
+  <p>Coffres dorés = +50 mats</p>
   <button onclick="startGame()">START</button>
 </div>
 
@@ -42,13 +42,11 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
 <div id="weapons">
   <div class="weapon active" onclick="setWeapon(0)">🔫 Pistol</div>
   <div class="weapon" onclick="setWeapon(1)">🔫 Shotgun</div>
-  <div class="weapon" onclick="setWeapon(2)">💣 Grenade</div>
 </div>
 
 <div id="joystick"><div id="stick"></div></div>
 <div id="btns">
   <button id="build">BUILD</button>
-  <button id="grenade">GRENADE</button>
   <button id="don">DON</button>
 </div>
 
@@ -60,7 +58,7 @@ button { padding:16px 22px; font-size:15px; border:none; border-radius:14px; col
 import * as THREE from 'three';
 
 let scene, camera, renderer, player, bullets=[], enemies=[], walls=[], chests=[];
-let hp=100, mats=200, kills=0, weapon=0, xp=0, level=1, gameStarted=false;
+let hp=100, mats=200, kills=0, weapon=0, gameStarted=false;
 let moveX=0, moveZ=0, lastShot=0;
 
 window.startGame = function() {
@@ -116,7 +114,6 @@ function init() {
     scene.add(tree);
   }
 
-  // COFFRES DORÉS AJOUTÉS ICI
   spawnChests();
   spawnEnemies();
   animate();
@@ -194,22 +191,6 @@ function build() {
   updateUI();
 }
 
-function grenade() {
-  if(!gameStarted) return;
-  enemies.forEach(e => {
-    if(e.position.distanceTo(player.position) < 10) {
-      e.hp -= 60;
-      if(e.hp <= 0) {
-        scene.remove(e);
-        enemies.splice(enemies.indexOf(e), 1);
-        kills++;
-        updateUI();
-        spawnEnemies();
-      }
-    }
-  });
-}
-
 function don() {
   mats += 100;
   updateUI();
@@ -227,7 +208,7 @@ function showLoot(txt) {
 }
 
 function updateUI() {
-  document.getElementById('hp').innerText = hp;
+  document.getElementById('hp').innerText = Math.floor(hp); // FIX: plus de décimales
   document.getElementById('mats').innerText = mats;
   document.getElementById('kills').innerText = kills;
 }
@@ -273,7 +254,6 @@ function setupControls() {
   });
 
   document.getElementById('build').onclick = build;
-  document.getElementById('grenade').onclick = grenade;
   document.getElementById('don').onclick = don;
 }
 
@@ -288,17 +268,16 @@ function animate() {
   camera.position.z = player.position.z + 8;
   camera.lookAt(player.position);
 
-  // LOOT COFFRES
+  // COFFRES
   chests = chests.filter(chest => {
     if(!chest.userData.opened && player.position.distanceTo(chest.position) < 2) {
       chest.userData.opened = true;
       chest.material.color.set(0x555);
       chest.material.emissive.set(0x000);
       mats += 50;
-      xp += 20;
       updateUI();
-      showLoot("+50 🧱 +20 XP");
-      weapon = Math.floor(Math.random()*3);
+      showLoot("+50 🧱");
+      weapon = Math.floor(Math.random()*2);
       setWeapon(weapon);
       showLoot("Nouvelle arme!");
     }
